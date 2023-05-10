@@ -1,59 +1,47 @@
 import tensorflow as tf
-from flask import Flask, render_template, request
 from keras.models import load_model
-from keras.preprocessing import image
-import numpy as np
 from PIL import Image
+from flask import Flask, render_template, request
+import numpy as np
 
 app = Flask(__name__)
 
-@app.route("/", methods=['GET'])
-def hello():
-    return render_template('index.html')
+# Load model
+model = load_model('./assets/modelPadang.h5')
+class_names = ['ayam_goreng', 'ayam_pop', 'daging_rendang', 'dendeng_batokok', 'gulai_ikan', 'gulai_tunjang', 'telur_balado', 'telur_dadar']
 
-@app.route('/', methods=['POST'])
-def predict():
-    # Get image file from request
-    imagefile = request.files['imagefile']
-    image_path = "static/images/temp.jpeg"
-    imagefile.save(image_path)
+def process_image(image_path):
+    img = Image.open(image_path)
+    img = img.resize((224, 224))
+    img = np.array(img) / 255.0
+    img = np.expand_dims(img, axis=0)
+    return img
 
-    # Load model
-    model = load_model('./assets/modelPadang.h5')
 
-    def chestScanPrediction(path, _model):
-        classes_dir = ['gulai_tunjang', 'telur_balado', 'telur_dadar', 'telur_dadar', 'gulai_tunjang']
-        # Loading Image
-        img = image.load_img(path, target_size=(224,224))
-        # Normalizing Image
-        norm_img = image.img_to_array(img)/255
-        # Converting Image to Numpy Array
-        input_arr_img = np.array([norm_img])
-        # Getting Predictions
-        pred = np.argmax(_model.predict(input_arr_img))
-        # Printing Model Prediction
-        pred_score = _model.predict(input_arr_img)
-        # print(classes_dir)
-        # print(pred_score)
-        # print(classes_dir[pred])
-        pred_score = np.array(pred_score)
+@app.route('/', methods=['GET', 'POST'])
+def upload_file():
+    if request.method == 'POST':
+        # Mendapatkan file gambar dari form
+        file = request.files['file']
 
-        # Normalisasi skor
-        total_skor = sum(pred_score[0])
-        skor_normal = [s/total_skor for s in pred_score[0]]
+        # Menyimpan file sementara
+        file_path = './static/images/temp.png'
+        file.save(file_path)
 
-        # Konversi skor ke persentase
-        skor_persen = [round(s * 100, 2) for s in skor_normal]
-        # print('setelah ubah')
-        print(skor_persen)
-        nilai_terbesar = max(skor_persen)
+        # Memproses gambar
+        img = process_image(file_path)
 
-        return [classes_dir, nilai_terbesar, classes_dir[pred]]
-    
-    path = image_path
-    result = chestScanPrediction(path,model)
+        # Melakukan klasifikasi gambar
+        predictions = model.predict(img)
+        predicted_class = np.argmax(predictions[0])
+        predicted_label = class_names[predicted_class]
+        accuracy = predictions[0][predicted_class] * 100
+        accuracy_formatted = "{:.2f}".format(accuracy)
 
-    return render_template('index.html', label = result[0], skor = result[1], prediction = result[2])
+        # Mengirimkan hasil klasifikasi ke halaman web
+        return render_template('index.html', label=predicted_label, accuracy=accuracy_formatted, image_file=file_path)
+    else:
+        return render_template('index.html', label=None, accuracy=None, image_file=None)
 
 if __name__ == "__main__":
     app.run(debug=True)
