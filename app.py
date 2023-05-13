@@ -7,7 +7,8 @@ import numpy as np
 app = Flask(__name__)
 
 # Load model
-model = load_model('./assets/modelPadang.h5')
+model = tf.keras.models.load_model('./assets/padangmodel.h5')
+
 class_names = ['ayam_goreng', 'ayam_pop', 'daging_rendang', 'dendeng_batokok', 'gulai_ikan', 'gulai_tunjang', 'telur_balado', 'telur_dadar']
 
 def process_image(image_path):
